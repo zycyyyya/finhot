@@ -11,7 +11,8 @@
 
 ## 先决条件
 
-知乎 API 使用 Bearer 鉴权，Access Secret 内置于脚本。调用频率：每天 1000 次（zhihu_search + global_search 各有 1000 次配额）。
+1. **知乎 API**：使用 Bearer 鉴权，Access Secret 内置于脚本。调用频率：每天 1000 次（zhihu_search + global_search 各有 1000 次配额）。
+2. **东方财富妙想搜索**：需要设置 `MX_APIKEY` 环境变量，密钥格式为 `mkt_...`。调用频率：单次请求间隔 0.5s 以上，避免触发限流。
 
 ## 触发关键词
 
@@ -37,6 +38,13 @@
 - **接口**: `GET https://developer.zhihu.com/api/v1/content/global_search`
 - **特点**: 全网内容搜索，含新闻、官网等外部源
 - **配额**: 1000 次/天
+
+### 3. 东方财富妙想搜索 (`mx_search`)
+- **接口**: `POST https://mkapi2.dfcfs.com/finskillshub/api/claw/news-search`
+- **特点**: 东方财富官方金融资讯搜索，含公告、研报、新闻、评级等
+- **鉴权**: API Key (`MX_APIKEY` 环境变量)
+- **分类策略**: 每个分类预定义 7 个专业搜索词，精准匹配金融保险领域
+- **限流**: 单次请求间隔 0.5s 以上，避免触发 112 错误码
 
 ### 扩展规划
 后续可通过以下方式新增数据源：
