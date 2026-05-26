@@ -1,0 +1,26 @@
+{
+  "author": "Github",
+  "author_icon": "https://static.marvis.qq.com/wupload/skill-author-icons/1778639349473_GitHub.png",
+  "description": "金融保险圈资讯查询 Skill。多数据源聚合（知乎API + 全网搜索 + 后续扩展），当用户想知道'金融圈动态'、'保险行业新闻'、'银保监会政策'、'金融产品发布'、'投资研究报告'、'金融技巧观点'等金融保险领域资讯时使用。Skill 会调用知乎API、全网搜索等数据源拉取数据并整理成中文 markdown 简报。",
+  "detail_describe": "多数据源聚合金融保险资讯\n知乎API高质量问答文章\n全网搜索新闻政策动态\n按监管/产品/行业/研究/观点分类\n整理成中文 Markdown 简报",
+  "display_description": "一键获取金融保险圈最新动态和深度分析",
+  "display_name": "finhot",
+  "download_count": 0,
+  "download_url": "",
+  "icon": "https://static.marvis.qq.com/wupload/skill-icons/1778579134828_%E6%8A%80%E8%83%BD%E5%9B%BE%E6%A0%87.png?imageMogr2/thumbnail/224x/format/webp",
+  "id": 0,
+  "is_downloaded": false,
+  "last_modified_time": "2026-05-26 12:14:00",
+  "md5": "",
+  "name": "finhot",
+  "scope": ["main", "search-agent"],
+  "type": "办公学习",
+  "use_cases": [
+    "今天金融圈有什么大新闻",
+    "保险行业最近有什么新政策",
+    "银保监会最新监管动态",
+    "金融产品发布资讯",
+    "投资研究报告汇总"
+  ],
+  "version": "1.0.0"
+}
