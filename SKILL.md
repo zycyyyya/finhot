@@ -15,7 +15,7 @@ description: 金融保险圈资讯查询 Skill。当用户想知道"今天金融
 |---|---|---|---|
 | 🔴 第一 | **neodata-financial-search** Skill | 金融保险政策、监管动态、行业新闻、宏观指标；自然语言查询 | Skill 调用 |
 | 🟡 第二 | **westock-data** Skill | 保险公司/银行个股公告、龙虎榜、研报评级、资金流向 | `westock-data` CLI |
-| 🟢 第三 | **RSS 公开源** | 银保监会/证监会官网、财新、21财经、华尔街见闻等 | `curl` RSS feed |
+| 🟢 第三 | **RSS 公开源** | 财新、华尔街见闻、第一财经、36氪、财联社、深交所等 | `curl` RSS feed（镜像站） |
 | 🔵 第四 | **Kimi WebBridge** | 需要 JS 渲染的站点，作为扩展补充 | daemon + 浏览器扩展 |
 
 ### 数据源选择规则
@@ -34,9 +34,10 @@ description: 金融保险圈资讯查询 Skill。当用户想知道"今天金融
 
 ```bash
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+RSSHUB="https://rsshub.liumingye.cn"   # 国内镜像，rsshub.app 不可达
 
-# 之后所有 curl 都加 -H "User-Agent: $UA"
-curl -sH "User-Agent: $UA" "https://rsshub.app/caixin/finance"
+# 之后所有 curl 都加 -H "User-Agent: $UA"，base 域名用 $RSSHUB
+curl -skH "User-Agent: $UA" "$RSSHUB/caixin/latest"
 ```
 
 ### 2. 依赖工具
@@ -141,50 +142,92 @@ westock-data asfund sh601318
 
 日报生成流程：
 1. **neodata-financial-search** 拉取当日金融保险资讯
-2. **RSS 源** 补充银保监会/证监会等官方原文链接
+2. **RSS 源** 补充财经媒体实时动态和交易所公告
 3. **westock-data** 补充保险板块行情和公告
 4. **客户端侧聚合**：去重 → 分类到五类 → 按发布时间排序 → 生成日报
 
 ```bash
-# Step 1: RSS 拉取监管源（银保监会/证监会）
+# Step 0: 设置 UA 和 RSSHub 镜像
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+RSSHUB="https://rsshub.liumingye.cn"   # 国内镜像，rsshub.app 在国内不可达
 
-# 银保监会法规（通过 RSSHub）
-curl -sH "User-Agent: $UA" "https://rsshub.app/gov/cbirc/law" | jq '[.items[]? | {title: .title, url: .link, publishedAt: .pubDate, source: "银保监会官网", category: "regulatory"}]'
+# Step 1: 深交所公告（监管源，银保监会/证监会 RSSHub 路由已下线）
+curl -skH "User-Agent: $UA" "$RSSHUB/szse/notice" | python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.stdin).getroot()
+for item in root.findall('.//item')[:10]:
+    print(f'- [{item.findtext(\"title\")}]({item.findtext(\"link\")})')
+"
 
-# 证监会公告
-curl -sH "User-Agent: $UA" "https://rsshub.app/gov/csrc/announcement" | jq '[.items[]? | {title: .title, url: .link, publishedAt: .pubDate, source: "证监会官网", category: "regulatory"}]'
+# Step 2: 财新最新
+curl -skH "User-Agent: $UA" "$RSSHUB/caixin/latest" | python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.stdin).getroot()
+for item in root.findall('.//item')[:10]:
+    print(f'- [{item.findtext(\"title\")}]({item.findtext(\"link\")})')
+"
 
-# Step 2: 财新金融频道
-curl -sH "User-Agent: $UA" "https://rsshub.app/caixin/finance" | jq '[.items[]? | {title: .title, url: .link, publishedAt: .pubDate, source: "财新网", category: "industry"}]'
+# Step 3: 华尔街见闻（实测33条/次）
+curl -skH "User-Agent: $UA" "$RSSHUB/wallstreetcn/news/global" | python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.stdin).getroot()
+for item in root.findall('.//item')[:10]:
+    print(f'- [{item.findtext(\"title\")}]({item.findtext(\"link\")})')
+"
 
-# Step 3: 21财经
-curl -sH "User-Agent: $UA" "https://rsshub.app/21jingji/finance" | jq '[.items[]? | {title: .title, url: .link, publishedAt: .pubDate, source: "21财经", category: "industry"}]'
+# Step 4: 第一财经
+curl -skH "User-Agent: $UA" "$RSSHUB/yicai/news" | python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.stdin).getroot()
+for item in root.findall('.//item')[:10]:
+    print(f'- [{item.findtext(\"title\")}]({item.findtext(\"link\")})')
+"
 
-# Step 4: 华尔街见闻
-curl -sH "User-Agent: $UA" "https://rsshub.app/wallstreetcn/news/global" | jq '[.items[]? | {title: .title, url: .link, publishedAt: .pubDate, source: "华尔街见闻", category: "industry"}]'
-
-# Step 5: 证券时报
-curl -sH "User-Agent: $UA" "https://rsshub.app/stcn/news" | jq '[.items[]? | {title: .title, url: .link, publishedAt: .pubDate, source: "证券时报", category: "industry"}]'
+# Step 5: 财联社深度
+curl -skH "User-Agent: $UA" "$RSSHUB/cls/depth" | python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.stdin).getroot()
+for item in root.findall('.//item')[:10]:
+    print(f'- [{item.findtext(\"title\")}]({item.findtext(\"link\")})')
+"
 ```
 
-> **注意**：RSSHub 路由可能随时变动。如果某个路由返回 404，尝试去掉子路径或查看 [RSSHub 文档](https://docs.rsshub.app) 确认最新路由。
+> **注意**：
+> - rsshub.app 公共实例在国内不可达，必须使用镜像站（如 `rsshub.liumingye.cn`）
+> - 银保监会已改名为国家金融监督管理总局（nfra.gov.cn），RSSHub 暂无适配路由，监管动态改由 neodata-financial-search + 财经媒体覆盖
+> - RSSHub 路由可能随时变动，如果某个路由返回 RSSHub 欢迎页而非 RSS XML，说明路由不存在或已变更
 
-### RSS 数据源清单
+### RSS 数据源清单（2026-05-27 实测验证）
 
-| 站点 | RSSHub 路由 | 分类 | 说明 |
+> **镜像**：rsshub.app 国内不可达，使用 `https://rsshub.liumingye.cn` 镜像
+> **银保监会**已改名为国家金融监督管理总局（nfra.gov.cn），RSSHub 暂无路由
+
+| 站点 | RSSHub 路由 | 分类 | 实测状态 |
 |---|---|---|---|
-| 银保监会法规 | `/gov/cbirc/law` | regulatory | 监管法规原文 |
-| 证监会公告 | `/gov/csrc/announcement` | regulatory | 发行审核、处罚公告 |
-| 央行货币政策 | `/gov/pbc/gov` | regulatory | 利率、准备金等 |
-| 财新金融 | `/caixin/finance` | industry | 综合财经 |
-| 财新保险 | `/caixin/insurance` | industry | 保险垂直 |
-| 21财经 | `/21jingji/finance` | industry | 金融政策深度 |
-| 华尔街见闻 | `/wallstreetcn/news/global` | industry | 全球宏观实时 |
-| 证券时报 | `/stcn/news` | industry | 资本市场 |
-| 第一财经 | `/yicai/finance` | industry | 综合财经 |
-| 36氪金融科技 | `/36kr/information/fintech` | insights | 金融科技/创投 |
-| 经济观察报 | `/eeo/finance` | research | 宏观行业深度 |
+| 深交所公告 | `/szse/notice` | regulatory | ✅ 20条 |
+| 华尔街见闻 | `/wallstreetcn/news/global` | industry | ✅ 33条 |
+| 财新最新 | `/caixin/latest` | industry | ✅ 19条 |
+| 财新文章 | `/caixin/article` | industry | ✅ 16条 |
+| 第一财经快讯 | `/yicai/brief` | industry | ✅ 1条 |
+| 第一财经新闻 | `/yicai/news` | industry | ✅ 20条 |
+| 财联社深度 | `/cls/depth` | research | ✅ 30条 |
+| 观察者网头条 | `/guancha/headline` | research | ✅ 20条 |
+| 36氪快讯 | `/36kr/newsflashes` | insights | ✅ 1条 |
+| 36氪热榜 | `/36kr/hot-list` | insights | ✅ 8条 |
+| 财联社电报 | `/cls/telegraph` | insights | ✅ 1条 |
+
+**以下路由已确认不可用**（返回 RSSHub 欢迎页 = 路由不存在）：
+| 站点 | 旧路由 | 状态 |
+|---|---|---|
+| 银保监会法规 | `/gov/cbirc/law` | ❌ 机构已改名 nfra |
+| 证监会公告 | `/gov/csrc/announcement` | ❌ 路由不存在 |
+| 央行货币政策 | `/gov/pbc/gov` | ❌ 路由不存在 |
+| 财新金融 | `/caixin/finance` | ❌ 改用 `/caixin/latest` |
+| 财新保险 | `/caixin/insurance` | ❌ 路由不存在 |
+| 21财经 | `/21jingji/finance` | ❌ 路由不存在 |
+| 证券时报 | `/stcn/news` | ❌ 路由不存在 |
+| 经济观察报 | `/eeo/finance` | ❌ 路由不存在 |
+| 36氪金融科技 | `/36kr/information/fintech` | ❌ 改用 `/36kr/newsflashes` |
 
 ### Python 脚本批量采集
 
@@ -368,7 +411,7 @@ python scripts/daily_generator.py --input ./data --output ./daily
 ## 常见错误处理
 
 - **neodata-financial-search 返回空**：该数据类型可能不在覆盖范围，切换到 westock-data 或 RSS 源
-- **RSSHub 路由 404**：路由可能已变更，查看 [RSSHub 文档](https://docs.rsshub.app) 确认最新路由，或去掉子路径重试
+- **RSSHub 路由返回欢迎页**：rsshub.app 国内不可达，必须用镜像站（如 `rsshub.liumingye.cn`）；如果镜像也返回 HTML 欢迎页说明该路由在镜像实例上不存在，查看 [RSSHub 文档](https://docs.rsshub.app) 确认最新路由
 - **westock-data 查不到代码**：先用 `westock-data search <公司名>` 搜索正确代码
 - **WebBridge daemon 不可用**：跳过 WebBridge 源，用前三层数据源即可
 - **数据源全部超时**：告知用户"当前数据源暂时不可用，请稍后再试"，不要编造内容

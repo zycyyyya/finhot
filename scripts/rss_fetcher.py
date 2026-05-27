@@ -25,23 +25,33 @@ except ImportError:
     sys.exit(1)
 
 # ========== RSS 源配置 ==========
-# 每个源定义：RSSHub 路由 + 分类 + 中文名
+# 每个源定义：RSSHub 路由 + 分类 + 中文名 + 镜像base
+# 注意：rsshub.app 公共实例在国内不可达，需使用镜像站
+# 镜像列表（按优先级）：rsshub.liumingye.cn > rsshub.rssforever.com > 自建
+# 实测日期：2026-05-27
+DEFAULT_RSSHUB_BASE = "https://rsshub.liumingye.cn"
+
 RSS_SOURCES: List[Dict] = [
-    # 监管政策
-    {"slug": "gov/cbirc/law", "name": "银保监会法规", "category": "regulatory", "base": "https://rsshub.app"},
-    {"slug": "gov/csrc/announcement", "name": "证监会公告", "category": "regulatory", "base": "https://rsshub.app"},
-    {"slug": "gov/pbc/gov", "name": "央行货币政策", "category": "regulatory", "base": "https://rsshub.app"},
-    # 行业动态
-    {"slug": "caixin/finance", "name": "财新金融", "category": "industry", "base": "https://rsshub.app"},
-    {"slug": "caixin/insurance", "name": "财新保险", "category": "industry", "base": "https://rsshub.app"},
-    {"slug": "21jingji/finance", "name": "21财经", "category": "industry", "base": "https://rsshub.app"},
-    {"slug": "wallstreetcn/news/global", "name": "华尔街见闻", "category": "industry", "base": "https://rsshub.app"},
-    {"slug": "stcn/news", "name": "证券时报", "category": "industry", "base": "https://rsshub.app"},
-    {"slug": "yicai/finance", "name": "第一财经", "category": "industry", "base": "https://rsshub.app"},
-    # 研究报告
-    {"slug": "eeo/finance", "name": "经济观察报", "category": "research", "base": "https://rsshub.app"},
-    # 技巧与观点
-    {"slug": "36kr/information/fintech", "name": "36氪金融科技", "category": "insights", "base": "https://rsshub.app"},
+    # --- 监管政策（实测：政府站路由大多被移除，改用交易所公告+财经媒体监管报道） ---
+    {"slug": "szse/notice", "name": "深交所公告", "category": "regulatory", "base": DEFAULT_RSSHUB_BASE},
+    # 注：银保监会已改名为国家金融监督管理总局(nfra.gov.cn)，RSSHub尚无适配路由
+    # 注：证监会、央行路由在公共镜像上不可用，监管动态改由财经媒体覆盖
+
+    # --- 行业动态（全部实测可用） ---
+    {"slug": "wallstreetcn/news/global", "name": "华尔街见闻", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "caixin/latest", "name": "财新最新", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "caixin/article", "name": "财新文章", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "yicai/brief", "name": "第一财经快讯", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "yicai/news", "name": "第一财经新闻", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
+
+    # --- 研究报告/深度 ---
+    {"slug": "cls/depth", "name": "财联社深度", "category": "research", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "guancha/headline", "name": "观察者网头条", "category": "research", "base": DEFAULT_RSSHUB_BASE},
+
+    # --- 技巧与观点 ---
+    {"slug": "36kr/newsflashes", "name": "36氪快讯", "category": "insights", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "36kr/hot-list", "name": "36氪热榜", "category": "insights", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "cls/telegraph", "name": "财联社电报", "category": "insights", "base": DEFAULT_RSSHUB_BASE},
 ]
 
 # 保险行业关键词（用于从通用 RSS 中过滤保险相关内容）
