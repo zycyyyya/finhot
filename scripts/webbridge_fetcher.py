@@ -165,7 +165,7 @@ def fetch_all(sources: Optional[List[dict]] = None, config_path: Optional[str] =
 def save_to_json(data: List[Dict], output_path: str):
     """保存数据到 JSON 文件"""
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dumps({
+        json.dump({
             "count": len(data),
             "items": data,
             "generated_at": datetime.utcnow().isoformat() + "Z",

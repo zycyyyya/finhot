@@ -82,7 +82,7 @@
     {
       "name": "今日头条财经频道",
       "url": "https://www.toutiao.com/ch/news_finance/",
-      "category": "news",
+      "category": "industry",
       "enabled": false,
       "description": "综合财经资讯聚合",
       "extraction": {
