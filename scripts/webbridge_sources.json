@@ -1,0 +1,94 @@
+{
+  "_说明": "Kimi WebBridge 自定义信息源配置。每个源的 enabled 设为 true 后，finhot 会通过浏览器抓取该站点内容。提取代码使用标准 JavaScript，需返回 JSON.stringify([...]) 格式。",
+  "_用法": "① 将需要启用的源 enabled 改为 true  ② 确保 Kimi WebBridge 浏览器扩展已连接  ③ finhot 自动读取此配置",
+  "sources": [
+    {
+      "name": "雪球",
+      "url": "https://xueqiu.com",
+      "category": "industry",
+      "enabled": false,
+      "description": "投资者社区，个股讨论、机构观点、市场情绪",
+      "extraction": {
+        "type": "evaluate",
+        "code": "(() => { const items = []; const articles = document.querySelectorAll('.timeline__item, article'); articles.forEach(el => { const title = el.querySelector('a')?.textContent.trim(); if (title && title.length > 8) items.push({ title: title, url: el.querySelector('a')?.href || '' }); }); return JSON.stringify(items.slice(0, 15)); })()"
+      }
+    },
+    {
+      "name": "36氪",
+      "url": "https://36kr.com/information/fintech/",
+      "category": "insights",
+      "enabled": false,
+      "description": "金融科技、创投动态",
+      "extraction": {
+        "type": "evaluate",
+        "code": "(() => { const items = []; document.querySelectorAll('.article-item-title, .item-title, [class*=\"title\"] a').forEach(el => { const t = el.textContent.trim(); if (t && t.length > 8 && !items.find(i => i.title === t)) items.push({ title: t, url: el.href }); }); return JSON.stringify(items.slice(0, 20)); })()"
+      }
+    },
+    {
+      "name": "华尔街见闻",
+      "url": "https://wallstreetcn.com/news/global",
+      "category": "industry",
+      "enabled": false,
+      "description": "全球宏观、实时快讯",
+      "extraction": {
+        "type": "evaluate",
+        "code": "(() => { const items = []; document.querySelectorAll('.article-item, .news-item, [class*=\"article\"] [class*=\"title\"]').forEach(el => { const t = el.textContent.trim(); if (t && t.length > 8) items.push({ title: t, url: el.closest('a')?.href || '' }); }); return JSON.stringify(items.slice(0, 20)); })()"
+      }
+    },
+    {
+      "name": "中国银行保险报",
+      "url": "https://www.cbimc.cn",
+      "category": "industry",
+      "enabled": false,
+      "description": "保险行业垂直新闻、监管动态（最对口信源）",
+      "extraction": {
+        "type": "evaluate",
+        "code": "(() => { const items = []; document.querySelectorAll('a[class*=\"title\"], .news-list a, .article-title').forEach(el => { const t = el.textContent.trim(); if (t && t.length > 8) items.push({ title: t, url: el.href }); }); return JSON.stringify(items.slice(0, 20)); })()"
+      }
+    },
+    {
+      "name": "21世纪经济报道",
+      "url": "https://www.21jingji.com/channel/finance/",
+      "category": "research",
+      "enabled": false,
+      "description": "金融政策、银行/保险专题深度报道",
+      "extraction": {
+        "type": "evaluate",
+        "code": "(() => { const items = []; document.querySelectorAll('.list-content a, .news-list a, [class*=\"title\"]').forEach(el => { const t = el.textContent.trim(); if (t && t.length > 8 && !items.find(i => i.title === t)) items.push({ title: t, url: el.href || el.closest('a')?.href || '' }); }); return JSON.stringify(items.slice(0, 20)); })()"
+      }
+    },
+    {
+      "name": "经济观察报",
+      "url": "https://www.eeo.com.cn",
+      "category": "research",
+      "enabled": false,
+      "description": "宏观经济、行业深度分析",
+      "extraction": {
+        "type": "evaluate",
+        "code": "(() => { const items = []; document.querySelectorAll('.news-title, .article-title, [class*=\"headline\"] a, .list-item a').forEach(el => { const t = el.textContent.trim(); if (t && t.length > 8) items.push({ title: t, url: el.href || el.closest('a')?.href || '' }); }); return JSON.stringify(items.slice(0, 20)); })()"
+      }
+    },
+    {
+      "name": "证券时报网",
+      "url": "https://www.stcn.com",
+      "category": "industry",
+      "enabled": false,
+      "description": "资本市场、上市公司公告",
+      "extraction": {
+        "type": "evaluate",
+        "code": "(() => { const items = []; document.querySelectorAll('.news-title, .article-title, [class*=\"list\"] a[class*=\"title\"]').forEach(el => { const t = el.textContent.trim(); if (t && t.length > 8) items.push({ title: t, url: el.href || '' }); }); return JSON.stringify(items.slice(0, 20)); })()"
+      }
+    },
+    {
+      "name": "今日头条财经频道",
+      "url": "https://www.toutiao.com/ch/news_finance/",
+      "category": "news",
+      "enabled": false,
+      "description": "综合财经资讯聚合",
+      "extraction": {
+        "type": "evaluate",
+        "code": "(() => { const items = []; document.querySelectorAll('.title, [class*=\"title\"] a, .feed-card-title, h1, h2, h3').forEach(el => { const t = el.textContent.trim(); if (t && t.length > 8 && !t.includes('扫码') && !t.includes('下载') && !items.find(i => i.title === t)) items.push({ title: t, url: el.closest('a')?.href || '' }); }); return JSON.stringify(items.slice(0, 25)); })()"
+      }
+    }
+  ]
+}
