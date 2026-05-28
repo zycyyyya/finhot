@@ -197,37 +197,21 @@ for item in root.findall('.//item')[:10]:
 > - 银保监会已改名为国家金融监督管理总局（nfra.gov.cn），RSSHub 暂无适配路由，监管动态改由 neodata-financial-search + 财经媒体覆盖
 > - RSSHub 路由可能随时变动，如果某个路由返回 RSSHub 欢迎页而非 RSS XML，说明路由不存在或已变更
 
-### RSS 数据源清单（2026-05-27 实测验证）
+### RSS 数据源清单（日报模式使用）
 
-> **镜像**：rsshub.app 国内不可达，使用 `https://rsshub.liumingye.cn` 镜像
-> **银保监会**已改名为国家金融监督管理总局（nfra.gov.cn），RSSHub 暂无路由
+> 镜像：`https://rsshub.liumingye.cn`（rsshub.app 国内不可达）
+> 银保监会→国家金融监督管理总局（nfra.gov.cn），监管动态改由 neodata 覆盖
 
-| 站点 | RSSHub 路由 | 分类 | 实测状态 |
-|---|---|---|---|
-| 深交所公告 | `/szse/notice` | regulatory | ✅ 20条 |
-| 华尔街见闻 | `/wallstreetcn/news/global` | industry | ✅ 33条 |
-| 财新最新 | `/caixin/latest` | industry | ✅ 19条 |
-| 财新文章 | `/caixin/article` | industry | ✅ 16条 |
-| 第一财经快讯 | `/yicai/brief` | industry | ✅ 1条 |
-| 第一财经新闻 | `/yicai/news` | industry | ✅ 20条 |
-| 财联社深度 | `/cls/depth` | research | ✅ 30条 |
-| 观察者网头条 | `/guancha/headline` | research | ✅ 20条 |
-| 36氪快讯 | `/36kr/newsflashes` | insights | ✅ 1条 |
-| 36氪热榜 | `/36kr/hot-list` | insights | ✅ 8条 |
-| 财联社电报 | `/cls/telegraph` | insights | ✅ 1条 |
-
-**以下路由已确认不可用**（返回 RSSHub 欢迎页 = 路由不存在）：
-| 站点 | 旧路由 | 状态 |
+| 站点 | 路由 | 分类 |
 |---|---|---|
-| 银保监会法规 | `/gov/cbirc/law` | ❌ 机构已改名 nfra |
-| 证监会公告 | `/gov/csrc/announcement` | ❌ 路由不存在 |
-| 央行货币政策 | `/gov/pbc/gov` | ❌ 路由不存在 |
-| 财新金融 | `/caixin/finance` | ❌ 改用 `/caixin/latest` |
-| 财新保险 | `/caixin/insurance` | ❌ 路由不存在 |
-| 21财经 | `/21jingji/finance` | ❌ 路由不存在 |
-| 证券时报 | `/stcn/news` | ❌ 路由不存在 |
-| 经济观察报 | `/eeo/finance` | ❌ 路由不存在 |
-| 36氪金融科技 | `/36kr/information/fintech` | ❌ 改用 `/36kr/newsflashes` |
+| 深交所公告 | `/szse/notice` | regulatory |
+| 华尔街见闻 | `/wallstreetcn/news/global` | industry |
+| 财新最新 | `/caixin/latest` | industry |
+| 第一财经新闻 | `/yicai/news` | industry |
+| 财联社深度 | `/cls/depth` | research |
+| 36氪热榜 | `/36kr/hot-list` | insights |
+
+> RSSHub 路由随时变动。返回欢迎页 = 路由不存在，跳过即可。失效路由不再列入本表。
 
 ### Python 脚本批量采集
 
@@ -411,10 +395,12 @@ python scripts/daily_generator.py --input ./data --output ./daily
 ## 常见错误处理
 
 - **neodata-financial-search 返回空**：该数据类型可能不在覆盖范围，切换到 westock-data 或 RSS 源
+- **neodata-financial-search 返回结果过少（<3 条）**：不直接透传给用户，自动降级到 westock-data 补充同类数据；如果 westock-data 也无结果，再补拉 RSS 相关源。最终在输出中注明"⚠️ 该问题 neodata 返回结果较少，已自动补充其他数据源"
 - **RSSHub 路由返回欢迎页**：rsshub.app 国内不可达，必须用镜像站（如 `rsshub.liumingye.cn`）；如果镜像也返回 HTML 欢迎页说明该路由在镜像实例上不存在，查看 [RSSHub 文档](https://docs.rsshub.app) 确认最新路由
 - **westock-data 查不到代码**：先用 `westock-data search <公司名>` 搜索正确代码
 - **WebBridge daemon 不可用**：跳过 WebBridge 源，用前三层数据源即可
-- **数据源全部超时**：告知用户"当前数据源暂时不可用，请稍后再试"，不要编造内容
+- **单个数据源超时（>10s）**：跳过该源，继续用其他可用数据源；在最终输出末尾注明"⚠️ [源名] 超时未获取"
+- **🔴 CHECKPOINT · 数据源全部不可用**：neodata-financial-search + westock-data + RSS 全部超时或返回空时，**必须立即停止，告知用户**："当前所有数据源暂时不可用（neodata/westock/RSS 均超时），请稍后再试。" **不要编造内容，不要凭训练数据填充。**
 
 ## 不要做
 
@@ -426,6 +412,7 @@ python scripts/daily_generator.py --input ./data --output ./daily
 - 不要并发猛拉 RSS — 串行 + 自然间隔，尊重源站限流
 - **不要在用户输出里暴露数据源名称 / curl 命令 / RSS feed URL / API 端点** — 这些是给开发者看的
 - **不要在合并输出时丢掉每条的 URL** — 每条 item 必须保留 url。用户看到一条没 URL 就追溯不到原文，这条信息等于不可信
+- **不要把单源少量结果（<3 条）当作完整答案输出** — 结果过少时必须补充其他数据源或明确告知用户"当前可获取结果有限"
 - **不要把数据源细节作为引用源** — 引用源写原始出处（银保监会官网 / 财新网 / 证券时报），不是工具名
 
 ---
