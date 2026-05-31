@@ -80,7 +80,7 @@ def main():
         print(f"保险/金融相关: {len(all_items)} 条")
 
     # 按发布时间排序
-    all_items.sort(key=lambda x: x.get("publishedAt") or "", reverse=True)
+    all_items.sort(key=lambda x: datetime.fromisoformat((x.get("publishedAt") or "1970-01-01T00:00:00Z").replace("Z", "+00:00")), reverse=True)
 
     # ========== Step 4: 保存 ==========
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

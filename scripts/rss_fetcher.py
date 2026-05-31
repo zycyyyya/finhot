@@ -272,9 +272,9 @@ def main():
         all_items = filter_insurance_related(all_items)
         print(f"保险/金融相关: {len(all_items)} 条")
 
-    # 按发布时间排序
+    # 按发布时间排序 (datetime comparison)
     all_items.sort(
-        key=lambda x: x.get("publishedAt") or "",
+        key=lambda x: datetime.fromisoformat((x.get("publishedAt") or "1970-01-01T00:00:00Z").replace("Z", "+00:00")),
         reverse=True
     )
 
