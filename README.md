@@ -4,9 +4,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-blue" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.2.0-blue" alt="version"/>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license"/>
-  <img src="https://img.shields.io/badge/data_sources-11_RSS_%2B_neodata_%2B_westock-orange" alt="sources"/>
+  <img src="https://img.shields.io/badge/data_sources-9_RSS_%2B_neodata_%2B_westock-orange" alt="sources"/>
   <img src="https://img.shields.io/badge/zero_backend-✓-success" alt="zero backend"/>
 </p>
 
@@ -81,25 +81,23 @@ git clone https://github.com/zycyyyya/finhot.git ~/.workbuddy/skills/finhot
 | 最近一周监管政策 | neodata + RSS 回溯查询 |
 | 看下精选条目 | neodata 精选模式 |
 
-## RSS 数据源（2026-05-27 实测验证）
+## RSS 数据源（2026-07-24 实测验证）
 
-通过 RSSHub 镜像站聚合，覆盖 11 个实测可用源：
+通过 RSSHub 多实例容错聚合（rsshub.rssforever.com 优先 + rsshub.liumingye.cn 兜底，自动检测并跳过陈旧缓存），覆盖 9 个实测可用源：
 
-| 源 | 分类 | 条目 |
+| 源 | 分类 | 采集方式 |
 |---|---|---|
-| 深交所公告 | 监管 | 20+ |
-| 华尔街见闻 | 行业 | 30+ |
-| 财新最新 | 行业 | 19 |
-| 财新文章 | 行业 | 16 |
-| 第一财经快讯 | 行业 | 实时 |
-| 第一财经新闻 | 行业 | 20 |
-| 财联社深度 | 研究 | 30 |
-| 观察者网头条 | 研究 | 20 |
-| 36氪快讯 | 观点 | 实时 |
-| 36氪热榜 | 观点 | 8 |
-| 财联社电报 | 观点 | 实时 |
+| 深交所公告 | 监管 | RSSHub |
+| 华尔街见闻 | 行业 | RSSHub |
+| 财新网 | 行业 | RSSHub |
+| 第一财经 | 行业 | RSSHub |
+| 财联社快讯 | 行业 | RSSHub |
+| 财联社深度 | 研究 | RSSHub |
+| 36氪 | 观点 | RSSHub |
+| 英为财情（股市资讯） | 行业 | Direct RSS |
+| 英为财情（技术分析） | 研究 | Direct RSS |
 
-> 镜像站 `rsshub.liumingye.cn`，rsshub.app 在国内不可达。
+> RSSHub 镜像优先 `rsshub.rssforever.com`（2026-07-24 实测数据新鲜），`rsshub.liumingye.cn` 作为兜底（部分源存在陈旧缓存问题，已自动检测跳过）。
 
 ## 文件结构
 

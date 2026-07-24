@@ -25,33 +25,39 @@ except ImportError:
     sys.exit(1)
 
 # ========== RSS 源配置 ==========
-# 每个源定义：RSSHub 路由 + 分类 + 中文名 + 镜像base
-# 注意：rsshub.app 公共实例在国内不可达，需使用镜像站
-# 镜像列表（按优先级）：rsshub.liumingye.cn > rsshub.rssforever.com > 自建
-# 实测日期：2026-05-27
-DEFAULT_RSSHUB_BASE = "https://rsshub.liumingye.cn"
+# RSSHub 多实例容错：按优先级依次尝试，陈旧 feed 自动跳过
+# 实测日期：2026-07-24（liumingye 财联社缓存停留 2026-05-28，rssforever 当日新鲜）
+RSSHUB_INSTANCES = [
+    "https://rsshub.rssforever.com",
+    "https://rsshub.liumingye.cn",
+]
+# 兼容旧字段
+DEFAULT_RSSHUB_BASE = RSSHUB_INSTANCES[0]
+
+# 陈旧判定：feed 最新条目超过此天数则视为缓存失效，尝试下一实例
+STALE_THRESHOLD_DAYS = 7
 
 RSS_SOURCES: List[Dict] = [
-    # --- 监管政策（实测：政府站路由大多被移除，改用交易所公告+财经媒体监管报道） ---
-    {"slug": "szse/notice", "name": "深交所公告", "category": "regulatory", "base": DEFAULT_RSSHUB_BASE},
+    # --- 监管政策 ---
+    {"slug": "szse/notice", "name": "深交所公告", "category": "regulatory"},
     # 注：银保监会已改名为国家金融监督管理总局(nfra.gov.cn)，RSSHub尚无适配路由
     # 注：证监会、央行路由在公共镜像上不可用，监管动态改由财经媒体覆盖
 
     # --- 行业动态（全部实测可用） ---
-    {"slug": "wallstreetcn/news/global", "name": "华尔街见闻", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
-    {"slug": "caixin/latest", "name": "财新最新", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
-    {"slug": "caixin/article", "name": "财新文章", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
-    {"slug": "yicai/brief", "name": "第一财经快讯", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
-    {"slug": "yicai/news", "name": "第一财经新闻", "category": "industry", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "wallstreetcn/news/global", "name": "华尔街见闻", "category": "industry"},
+    {"slug": "caixin/latest", "name": "财新网", "category": "industry"},
+    {"slug": "yicai/news", "name": "第一财经", "category": "industry"},
 
     # --- 研究报告/深度 ---
-    {"slug": "cls/depth", "name": "财联社深度", "category": "research", "base": DEFAULT_RSSHUB_BASE},
-    {"slug": "guancha/headline", "name": "观察者网头条", "category": "research", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "cls/depth", "name": "财联社深度", "category": "research"},
+    {"slug": "cls/telegraph", "name": "财联社", "category": "industry"},
 
     # --- 技巧与观点 ---
-    {"slug": "36kr/newsflashes", "name": "36氪快讯", "category": "insights", "base": DEFAULT_RSSHUB_BASE},
-    {"slug": "36kr/hot-list", "name": "36氪热榜", "category": "insights", "base": DEFAULT_RSSHUB_BASE},
-    {"slug": "cls/telegraph", "name": "财联社电报", "category": "insights", "base": DEFAULT_RSSHUB_BASE},
+    {"slug": "36kr/newsflashes", "name": "36氪", "category": "insights"},
+
+    # --- Direct RSS（英为财情，不经过 RSSHub） ---
+    {"direct_url": "https://cn.investing.com/rss/news_25.rss", "name": "英为财情", "category": "industry"},
+    {"direct_url": "https://cn.investing.com/rss/stock_Technical.rss", "name": "英为财情", "category": "research"},
 ]
 
 # 保险行业关键词（用于从通用 RSS 中过滤保险相关内容）
@@ -119,59 +125,123 @@ def classify_title(title: str, default_category: str) -> str:
     return default_category
 
 
-def fetch_rss(source: Dict, max_entries: int = 30, request_delay: float = 1.0) -> List[Dict]:
-    """从单个 RSS 源采集数据"""
-    base = source.get("base", "https://rsshub.app")
-    slug = source["slug"]
-    url = f"{base}/{slug}"
+def _parse_feed_entries(feed, source, max_entries):
+    """从 feedparser 结果提取标准化条目列表"""
+    items = []
+    for entry in feed.entries[:max_entries]:
+        title = getattr(entry, "title", "").strip()
+        link = getattr(entry, "link", "").strip()
 
-    print(f"[RSS] 正在采集 {source['name']} ...", end=" ", flush=True)
+        if not title or not link:
+            continue
 
-    try:
-        feed = feedparser.parse(url, request_headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        published_at = parse_published_at(entry)
+        default_cat = source.get("category", "industry")
+        category = classify_title(title, default_cat)
+
+        summary = ""
+        if hasattr(entry, "summary"):
+            summary = entry.summary.strip()[:500]
+        elif hasattr(entry, "description"):
+            summary = entry.description.strip()[:500]
+
+        items.append({
+            "id": generate_id(link),
+            "title": title,
+            "url": link,
+            "source": source["name"],
+            "publishedAt": published_at,
+            "summary": summary if summary else None,
+            "category": category,
         })
+    return items
 
-        if feed.bozo and not feed.entries:
-            print(f"❌ 解析失败: {feed.bozo_exception}")
+
+def _is_feed_stale(entries, threshold_days=STALE_THRESHOLD_DAYS):
+    """检测 feed 是否为陈旧缓存：如果所有条目都超过 threshold_days 则判定为陈旧"""
+    if not entries:
+        return True
+    cutoff = datetime.now(timezone.utc) - timedelta(days=threshold_days)
+    for entry in entries:
+        published_at = parse_published_at(entry)
+        if published_at:
+            try:
+                dt_str = published_at.replace("Z", "+00:00")
+                dt = datetime.fromisoformat(dt_str)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if dt >= cutoff:
+                    return False  # 至少有一条是新鲜的
+            except (ValueError, TypeError):
+                continue
+    return True
+
+
+def fetch_rss(source: Dict, max_entries: int = 30, request_delay: float = 1.0) -> List[Dict]:
+    """从单个 RSS 源采集数据（支持 RSSHub 多实例容错 + 直采 RSS）"""
+
+    # Direct RSS（英为财情等，不经过 RSSHub）
+    if "direct_url" in source:
+        url = source["direct_url"]
+        print(f"[RSS] 正在采集 {source['name']} (direct) ...", end=" ", flush=True)
+        try:
+            feed = feedparser.parse(url, request_headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+            })
+            if feed.bozo and not feed.entries:
+                print(f"❌ 解析失败: {feed.bozo_exception}")
+                return []
+            items = _parse_feed_entries(feed, source, max_entries)
+            print(f"✅ {len(items)} 条")
+            time.sleep(request_delay)
+            return items
+        except Exception as e:
+            print(f"❌ 错误: {e}")
             return []
 
-        items = []
-        for entry in feed.entries[:max_entries]:
-            title = getattr(entry, "title", "").strip()
-            link = getattr(entry, "link", "").strip()
+    # RSSHub 多实例容错
+    slug = source["slug"]
+    print(f"[RSS] 正在采集 {source['name']} ...", end=" ", flush=True)
 
-            if not title or not link:
-                continue
-
-            published_at = parse_published_at(entry)
-            default_cat = source.get("category", "industry")
-            category = classify_title(title, default_cat)
-
-            # 提取摘要
-            summary = ""
-            if hasattr(entry, "summary"):
-                summary = entry.summary.strip()[:500]
-            elif hasattr(entry, "description"):
-                summary = entry.description.strip()[:500]
-
-            items.append({
-                "id": generate_id(link),
-                "title": title,
-                "url": link,
-                "source": source["name"],
-                "publishedAt": published_at,
-                "summary": summary if summary else None,
-                "category": category,
+    for idx, base in enumerate(RSSHUB_INSTANCES):
+        url = f"{base}/{slug}"
+        try:
+            feed = feedparser.parse(url, request_headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
             })
 
-        print(f"✅ {len(items)} 条")
-        time.sleep(request_delay)  # 尊重源站限流
-        return items
+            if feed.bozo and not feed.entries:
+                if idx < len(RSSHUB_INSTANCES) - 1:
+                    print(f"⚠️ {base} 解析失败，尝试下一实例", end=" → ", flush=True)
+                    continue
+                else:
+                    print(f"❌ 全部实例均失败: {feed.bozo_exception}")
+                    return []
 
-    except Exception as e:
-        print(f"❌ 错误: {e}")
-        return []
+            # 陈旧 feed 检测
+            if _is_feed_stale(feed.entries):
+                if idx < len(RSSHUB_INSTANCES) - 1:
+                    print(f"⚠️ {base} feed 陈旧，尝试下一实例", end=" → ", flush=True)
+                    continue
+                else:
+                    print(f"⚠️ 全部实例均陈旧，使用最后一个")
+            elif base != RSSHUB_INSTANCES[0]:
+                print(f"✅ {base} 兜底", end=" ", flush=True)
+
+            items = _parse_feed_entries(feed, source, max_entries)
+            print(f"✅ {len(items)} 条")
+            time.sleep(request_delay)
+            return items
+
+        except Exception as e:
+            if idx < len(RSSHUB_INSTANCES) - 1:
+                print(f"⚠️ {base} 错误: {e}，尝试下一实例", end=" → ", flush=True)
+                continue
+            else:
+                print(f"❌ 全部实例均失败: {e}")
+                return []
+
+    return []
 
 
 def filter_by_time(items: List[Dict], days: int) -> List[Dict]:
