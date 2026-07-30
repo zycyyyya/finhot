@@ -11,10 +11,13 @@ import urllib.request
 import json
 import time
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from typing import List, Dict, Optional
+from urllib.parse import urlparse
 
 DAEMON_URL = "http://127.0.0.1:10086/command"
+VALID_CATEGORIES = {"regulatory", "products", "industry", "research", "insights"}
+MAX_FIELD_LENGTH = 5000
 
 
 def _call_daemon(action: str, args: Optional[dict] = None, session: str = "finhot-webbridge") -> dict:
@@ -41,8 +44,31 @@ def health_check() -> dict:
     return json.loads(resp.read().decode("utf-8"))
 
 
+def is_safe_http_url(value: str) -> bool:
+    """仅允许 http/https，阻止 javascript/file/data 等危险协议。"""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    parsed = urlparse(value)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def normalize_published_at(value) -> Optional[str]:
+    """返回规范 UTC ISO 时间；缺失或无法解析时返回 None。"""
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    except ValueError:
+        return None
+
+
 def navigate(url: str, session: str = "finhot-webbridge") -> bool:
-    """导航到目标 URL"""
+    """导航到经过协议校验的目标 URL。"""
+    if not is_safe_http_url(url):
+        return False
     result = _call_daemon("navigate", {"url": url, "newTab": True}, session)
     return result.get("ok", False) and result.get("data", {}).get("success", False)
 
@@ -86,6 +112,8 @@ def fetch_from_source(source: dict, session: str = "finhot-webbridge") -> List[D
     name = source.get("name", "未知来源")
     url = source.get("url", "")
     category = source.get("category", "industry")
+    if category not in VALID_CATEGORIES:
+        category = "industry"
     extraction = source.get("extraction", {})
 
     results = []
@@ -108,21 +136,35 @@ def fetch_from_source(source: dict, session: str = "finhot-webbridge") -> List[D
             return results
 
         items = json.loads(raw)
-        for item in items:
-            if isinstance(item, dict):
-                item.setdefault("source", name)
-                item.setdefault("category", category)
-                if "publishedAt" not in item:
-                    item["publishedAt"] = datetime.utcnow().isoformat() + "Z"
-            elif isinstance(item, str):
-                item = {
-                    "title": item,
-                    "source": name,
-                    "category": category,
-                    "publishedAt": datetime.utcnow().isoformat() + "Z",
-                    "url": url
-                }
-            results.append(item)
+        if not isinstance(items, list):
+            raise ValueError("提取结果必须是 JSON 数组")
+
+        fetched_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        for raw_item in items[:50]:
+            if isinstance(raw_item, str):
+                item = {"title": raw_item, "url": url}
+            elif isinstance(raw_item, dict):
+                item = dict(raw_item)
+            else:
+                continue
+
+            title = str(item.get("title", "")).strip()[:500]
+            item_url = item.get("url") or url
+            if len(title) < 4 or not is_safe_http_url(item_url):
+                continue
+
+            published_at = normalize_published_at(item.get("publishedAt"))
+            summary = str(item.get("summary", "")).strip()[:MAX_FIELD_LENGTH]
+            results.append({
+                "title": title,
+                "url": item_url,
+                "summary": summary,
+                "source": name,
+                "category": category,
+                "publishedAt": published_at,
+                "fetchedAt": fetched_at,
+                "timeConfidence": "source" if published_at else "unknown",
+            })
 
         print(f"[WebBridge] {name}: 获取 {len(results)} 条")
 
@@ -168,7 +210,7 @@ def save_to_json(data: List[Dict], output_path: str):
         json.dump({
             "count": len(data),
             "items": data,
-            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "source_type": "webbridge"
         }, f, ensure_ascii=False, indent=2)
     print(f"[WebBridge] 数据已保存: {output_path} ({len(data)} 条)")

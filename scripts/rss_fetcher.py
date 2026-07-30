@@ -93,11 +93,17 @@ def parse_published_at(entry) -> Optional[str]:
             except (TypeError, ValueError):
                 continue
 
-    # 回退：尝试原始字符串
+    # 回退：仅保留能够规范解析的原始字符串，避免把非 ISO 日期带入排序。
     for field in ["published", "updated", "created"]:
         val = getattr(entry, field, None)
         if val:
-            return val
+            try:
+                normalized = datetime.fromisoformat(str(val).replace("Z", "+00:00"))
+                if normalized.tzinfo is None:
+                    normalized = normalized.replace(tzinfo=timezone.utc)
+                return normalized.astimezone(timezone.utc).isoformat()
+            except (TypeError, ValueError):
+                continue
 
     return None
 
@@ -151,6 +157,8 @@ def _parse_feed_entries(feed, source, max_entries):
             "url": link,
             "source": source["name"],
             "publishedAt": published_at,
+            "fetchedAt": datetime.now(timezone.utc).isoformat(),
+            "timeConfidence": "source" if published_at else "unknown",
             "summary": summary if summary else None,
             "category": category,
         })
@@ -255,8 +263,7 @@ def filter_by_time(items: List[Dict], days: int) -> List[Dict]:
     for item in items:
         published_at = item.get("publishedAt")
         if not published_at:
-            # 没有发布时间的条目保留（可能很新）
-            filtered.append(item)
+            # 无法确认发布时间的条目不能进入“最近 N 天”结果。
             continue
 
         try:
@@ -268,11 +275,9 @@ def filter_by_time(items: List[Dict], days: int) -> List[Dict]:
                     dt = dt.replace(tzinfo=timezone.utc)
                 if dt >= cutoff:
                     filtered.append(item)
-            else:
-                filtered.append(item)
         except (ValueError, TypeError):
-            # 解析失败则保留
-            filtered.append(item)
+            # 无法解析时间的条目不进入时间窗口结果。
+            continue
 
     return filtered
 
@@ -289,15 +294,25 @@ def filter_insurance_related(items: List[Dict]) -> List[Dict]:
     return filtered
 
 
+def normalize_title(title: str) -> str:
+    """用于近似重复判断的标题归一化，不截断固定前缀。"""
+    return "".join(ch.lower() for ch in (title or "") if ch.isalnum())
+
+
 def deduplicate(items: List[Dict]) -> List[Dict]:
-    """按 URL 去重"""
+    """按 URL 和完整归一化标题双重去重。"""
     seen_urls = set()
+    seen_titles = set()
     unique = []
     for item in items:
         url = item.get("url", "")
-        if url not in seen_urls:
-            seen_urls.add(url)
-            unique.append(item)
+        title_key = normalize_title(item.get("title", ""))
+        if not url or url in seen_urls or (len(title_key) >= 8 and title_key in seen_titles):
+            continue
+        seen_urls.add(url)
+        if len(title_key) >= 8:
+            seen_titles.add(title_key)
+        unique.append(item)
     return unique
 
 
@@ -342,11 +357,18 @@ def main():
         all_items = filter_insurance_related(all_items)
         print(f"保险/金融相关: {len(all_items)} 条")
 
-    # 按发布时间排序 (datetime comparison)
-    all_items.sort(
-        key=lambda x: datetime.fromisoformat((x.get("publishedAt") or "1970-01-01T00:00:00Z").replace("Z", "+00:00")),
-        reverse=True
-    )
+    # 按发布时间稳健排序；无效时间统一排在末尾。
+    def sort_key(item: Dict) -> datetime:
+        try:
+            value = item.get("publishedAt")
+            if not value:
+                raise ValueError
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            return datetime.min.replace(tzinfo=timezone.utc)
+
+    all_items.sort(key=sort_key, reverse=True)
 
     # 保存
     os.makedirs(args.output, exist_ok=True)

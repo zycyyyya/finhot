@@ -127,15 +127,46 @@ def merge_data(rss_items: List[Dict], extra_items: Optional[List[Dict]] = None) 
     return merged
 
 
+def parse_published_at(value: Optional[str]) -> Optional[datetime]:
+    """解析 ISO 8601 时间；无法解析时返回 None。"""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def filter_items_for_beijing_date(items: List[Dict], target_date: str) -> List[Dict]:
+    """按北京时间自然日筛选。无发布时间条目不冒充指定日期资讯。"""
+    target = datetime.strptime(target_date, "%Y-%m-%d").date()
+    beijing_tz = timezone(timedelta(hours=8))
+    filtered = []
+    for item in items:
+        published = parse_published_at(item.get("publishedAt"))
+        if published and published.astimezone(beijing_tz).date() == target:
+            filtered.append(item)
+    return filtered
+
+
+def item_sort_key(item: Dict) -> datetime:
+    return parse_published_at(item.get("publishedAt")) or datetime.min.replace(tzinfo=timezone.utc)
+
+
 def build_daily(items: List[Dict], date_str: Optional[str] = None) -> Dict:
-    """将条目列表构建为日报结构"""
-    # 确定日期
+    """将条目列表构建为北京时间自然日的日报结构。"""
     if date_str:
+        datetime.strptime(date_str, "%Y-%m-%d")
         target_date = date_str
     else:
-        # 北京时间
         now_bj = datetime.now(timezone(timedelta(hours=8)))
         target_date = now_bj.strftime("%Y-%m-%d")
+
+    items = filter_items_for_beijing_date(items, target_date)
+    items = sorted(items, key=item_sort_key, reverse=True)
 
     # 分类到五版块
     sections = []
@@ -149,6 +180,7 @@ def build_daily(items: List[Dict], date_str: Optional[str] = None) -> Dict:
                     "summary": item.get("summary", "")[:200] if item.get("summary") else "",
                     "sourceUrl": item.get("url", ""),
                     "sourceName": item.get("source", ""),
+                    "publishedAt": item.get("publishedAt"),
                 })
             sections.append({
                 "label": cat_info["label"],
@@ -177,14 +209,19 @@ def build_daily(items: List[Dict], date_str: Optional[str] = None) -> Dict:
                 "title": item["title"],
                 "sourceName": item["sourceName"],
                 "sourceUrl": item["sourceUrl"],
-                "publishedAt": "",
+                "publishedAt": item.get("publishedAt"),
             })
+
+    beijing_tz = timezone(timedelta(hours=8))
+    window_start_bj = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=beijing_tz)
+    window_end_bj = window_start_bj + timedelta(days=1)
 
     daily = {
         "date": target_date,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
-        "windowStart": f"{target_date}T00:00:00.000Z",
-        "windowEnd": f"{target_date}T23:59:59.999Z",
+        "generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "windowStart": window_start_bj.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "windowEnd": window_end_bj.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "timeZone": "Asia/Shanghai",
         "lead": lead,
         "sections": sections,
         "flashes": flashes,
