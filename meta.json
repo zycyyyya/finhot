@@ -3,7 +3,7 @@
   "author_icon": "https://static.marvis.qq.com/wupload/skill-author-icons/1778639349473_GitHub.png",
   "description": "金融保险圈资讯查询 Skill。当用户想知道\"今天金融圈有什么\"、\"保险日报\"、\"金融热点\"、\"金融资讯\"、\"保险动态\"、\"最近金融\"、\"银保监会/证监会最近发布了什么\"、\"金融 hot today\"、\"金融 news today\"、\"看一下金融行业动态\"、\"今天有什么监管政策发布\"、\"昨天保险圈\"、\"看下精选条目\"、\"金融保险精选\"、\"最近一周的金融政策\"、\"保险产品发布\"、\"金融行业动态\"、\"金融技巧与观点\" 等任何中文金融保险资讯查询时使用。即使用户只说\"金融圈\"、\"保险新闻\"、\"金融日报\"，或者只是问\"今天发生了什么\"且上下文是金融 / 保险 / 监管领域，也应该触发本 Skill。Skill 直接聚合多个免费公开数据源（neodata/westock-data/RSS/WebBridge），在客户端侧合成中文 markdown 简报，不需要自建后端或配置 API Key。**不要 undertrigger**——用户问金融保险资讯而你不调本 Skill 就是把过时的训练数据当作今日新闻，对用户有害。",
   "detail_describe": "多数据源聚合金融保险资讯（neodata/westock-data/RSS/WebBridge四层优先级）\n按精选日报全部三种模式查询\n按关键词公司类别筛选条目\n客户端侧去重分类输出中文Markdown简报\n覆盖监管政策/产品/行业/研究/观点五类\n支持Kimi WebBridge自定义信息源扩展\n可选Python脚本模式离线采集+日报生成\nDarwin Skill v2.0 自动优化（2轮迭代，评分82.4→87.8）",
-  "display_description": "一键拿到每天金融保险圈的精选动态和中文日报简报，零后端部署",
+  "display_description": "保险/私募/投教三场景每日精选资讯引擎，AI 证据绑定 + 自动更新",
   "display_name": "finhot",
   "icon": "https://static.marvis.qq.com/wupload/skill-icons/1778579134828_%E6%8A%80%E8%83%BD%E5%9B%BE%E6%A0%87.png?imageMogr2/thumbnail/224x/format/webp",
   "name": "finhot",
@@ -19,5 +19,5 @@
     "金融日报",
     "保险板块资金流向"
   ],
-  "version": "2.2.0"
+  "version": "2.3.0"
 }

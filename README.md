@@ -1,13 +1,13 @@
 <p align="center">
   <strong>finhot</strong><br/>
-  <em>金融保险圈每日资讯 — 一句话拿简报</em>
+  <em>金融保险圈每日精选资讯引擎</em>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.2.0-blue" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.3.0-blue" alt="version"/>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license"/>
-  <img src="https://img.shields.io/badge/data_sources-9_RSS_%2B_neodata_%2B_westock-orange" alt="sources"/>
-  <img src="https://img.shields.io/badge/zero_backend-✓-success" alt="zero backend"/>
+  <img src="https://img.shields.io/badge/data_sources-9_RSS_→_多源容错-orange" alt="sources"/>
+  <img src="https://img.shields.io/badge/AI-SenseNova_DeeepSeek_V4-purple" alt="AI"/>
 </p>
 
 <p align="center">
@@ -18,114 +18,112 @@
 
 ## 它是什么
 
-finhot 是一个 Agent Skill（SKILL.md 格式），安装后你可以直接对 AI 说：
+finhot 是一个面向保险运营、二级市场投教和私募销售运营从业者的自动资讯聚合与分析引擎。每日从多个公开信源采集行业动态，经过去重、来源分层、AI 证据化分析和三场景独立评分后，输出结构化数据驱动静态前端站点 [finhot-web](https://github.com/zycyyyya/finhot-web)。
 
-> *"今天金融圈有什么"* → 自动拉取最新资讯，分类输出简报
-> *"金融日报"* → 多源聚合，生成分版块的日报
-> *"平安保险最近公告"* → 结构化查询个股研报和公告
+核心能力：
 
-**不需要自建服务器、不需要 API Key、零部署成本。** Skill 直接在客户端调多个公开数据源，聚合后输出中文 Markdown。
+- **多源采集** — 9 条 RSS（RSSHub 多实例容错 + 直连 RSS），单源自适应 30→50 条，触顶监控
+- **AI Schema 2.0** — SenseNova DeepSeek-v4-Flash 两段式生成，所有结论绑定原文证据 ID，无效结论自动剔除
+- **三场景评分** — 保险运营 / 私募销售运营 / 二级市场投教独立 0-100 适配度
+- **业务选稿** — 唯一主场景分配 + 24 条场景配额精选（保险 6 / 私募 7 / 投教 11）
+- **事件聚类** — 中文双字 + 主题词相似度聚类，跨日稳定事件 ID，120 天持久化
+- **来源健康** — 逐来源可用/失败/陈旧/触顶状态，覆盖率自动监控，失败不发布
+- **质量门** — URL 安全、时间校验、标题去重、近似标题去重、字段完整性、证据悬空检测
+- **自动运行** — GitHub Actions 北京时间 08:15 主运行 + 12:17/16:19/20:21 错峰保底
+- **自动告警** — 连续失败、低覆盖率、数据陈旧、调度延迟、连续触顶和 AI 回退均自动创建 Issue
 
 ## 架构
 
 ```
-用户自然语言提问
+RSSHub 多实例 + 直连 RSS (9 源)
         │
         ▼
-  ┌─ neodata-financial-search ── 金融保险全品类自然语言查询
-  │
-  ├─ westock-data ──────────── 个股公告 / 研报评级 / 资金流向
-  │
-  ├─ RSS 聚合 ──────────────── 财新 / 华尔街见闻 / 第一财经 / 36氪 / 财联社 / 深交所
-  │
-  └─ Kimi WebBridge ────────── JS 渲染站点扩展
+  采集与清洗（URL 规范化 / 标题去重 / 时间校验 / 乱码过滤）
         │
         ▼
-  客户端侧：去重 → 五类分类 → 时间排序 → Markdown 简报
+  AI Schema 2.0 分析（两段 LLM，独立容错，429 退避重试）
+        │
+        ▼
+  三场景评分 + 业务选稿（唯一主场景 / 场景配额精选）
+        │
+        ▼
+  事件聚类 + 证据校验（稳定事件 ID / 历史证据库 / 证据悬空检测）
+        │
+        ▼
+  data.js → GitHub Pages 纯静态部署
 ```
 
-## 五类分类
+## 数据源
 
-| 分类 | 覆盖内容 |
-|:---:|---|
-| 🏛 监管政策 | 国家金融监管总局 / 证监会 / 央行发文 |
-| 📦 产品发布 | 新保险产品、银行理财、基金发行 |
-| 📊 行业动态 | 险企人事变动、并购、业绩、市场数据 |
-| 📑 研究报告 | 券商研报、行业白皮书、学术研究 |
-| 💡 观点洞察 | 从业者观点、展业经验、合规提醒 |
+| 源 | 分类 | 采集方式 | 来源层级 |
+|---|---|---|---|
+| 中国证监会 | 监管 | RSSHub | S0 原始源 |
+| 深圳证券交易所 | 监管 | RSSHub | S0 原始源 |
+| 财新网 | 行业 | RSSHub | S2 专业媒体 |
+| 华尔街见闻 | 行业 | RSSHub | S2 专业媒体 |
+| 第一财经 | 行业 | RSSHub | S2 专业媒体 |
+| 财联社快讯 | 行业 | RSSHub | S3 快讯线索 |
+| 财联社深度 | 研究 | RSSHub | S2 专业媒体 |
+| 36氪 | 观点 | RSSHub | S3 观点线索 |
+| 英为财情 | 行业 | Direct RSS | S2 专业媒体 |
 
-## 快速安装
+> RSSHub 实例：`rsshub.rssforever.com` 优先，`rsshub-balancer.virworks.moe` 兜底；自动检测陈旧缓存并回退。
 
-```bash
-# 一键安装到 Skill 目录
-curl -fsSL https://raw.githubusercontent.com/zycyyyya/finhot/main/install.sh | bash
-```
+## AI 分析说明
 
-或手动安装：
-
-```bash
-git clone https://github.com/zycyyyya/finhot.git ~/.workbuddy/skills/finhot
-```
-
-重启 Agent 后即可使用。
-
-## 使用示例
-
-| 你说 | Skill 响应 |
-|---|---|
-| 今天金融圈有什么 | neodata 查询 → 分类输出当日热点 |
-| 金融日报 | 多源聚合 → 生成分版块日报 |
-| 银保监会最近发了什么 | neodata 关键词查询 + RSS 补充 |
-| 平安保险最近公告 | westock-data 个股研报 + 公告 |
-| 保险板块资金流向 | westock-data 板块资金查询 |
-| 最近一周监管政策 | neodata + RSS 回溯查询 |
-| 看下精选条目 | neodata 精选模式 |
-
-## RSS 数据源（2026-07-24 实测验证）
-
-通过 RSSHub 多实例容错聚合（rsshub.rssforever.com 优先 + rsshub.liumingye.cn 兜底，自动检测并跳过陈旧缓存），覆盖 9 个实测可用源：
-
-| 源 | 分类 | 采集方式 |
-|---|---|---|
-| 深交所公告 | 监管 | RSSHub |
-| 华尔街见闻 | 行业 | RSSHub |
-| 财新网 | 行业 | RSSHub |
-| 第一财经 | 行业 | RSSHub |
-| 财联社快讯 | 行业 | RSSHub |
-| 财联社深度 | 研究 | RSSHub |
-| 36氪 | 观点 | RSSHub |
-| 英为财情（股市资讯） | 行业 | Direct RSS |
-| 英为财情（技术分析） | 研究 | Direct RSS |
-
-> RSSHub 镜像优先 `rsshub.rssforever.com`（2026-07-24 实测数据新鲜），`rsshub.liumingye.cn` 作为兜底（部分源存在陈旧缓存问题，已自动检测跳过）。
+- **模型**：SenseNova `deepseek-v4-flash`（OpenAI 兼容接口）
+- **调用策略**：两段分别生成（摘要+趋势 / 话术），独立容错，429 限流时 10/20 秒退避重试
+- **校验层**：结构校验、枚举校验、长度校验、证据 ID 校验；无有效证据的结论自动剔除
+- **回退机制**：任何一段失败时仅回退该段对应板块为规则分析，另一段成功结果保留
+- **Cached 模式**：错峰保底运行复用上次 AI 内容，但仍执行字段校验和错误清理
 
 ## 文件结构
 
 ```
 finhot/
-├── SKILL.md                    # Skill 主文件
-├── README.md                   # 本文件
-├── meta.json                   # Skill 元数据
-├── install.sh                  # 一行安装脚本
-└── scripts/
-    ├── rss_fetcher.py          # RSS 采集器
-    ├── daily_generator.py      # 日报生成器
-    ├── fetch_all.py            # 全量采集入口
-    ├── webbridge_fetcher.py    # WebBridge 模块
-    └── webbridge_sources.json  # WebBridge 源配置
+├── scripts/
+│   ├── fetch.js           # 主采集引擎（RSS 抓取 + AI 分析 + 数据输出）
+│   ├── core.js            # 共享安全、质量和去重模块
+│   ├── analysis.js        # AI 分析、评分、事件聚类、业务选稿
+│   ├── health.js          # 来源健康监控与发布质量门
+│   ├── history.js         # 90 天历史证据库 + 120 天事件库
+│   ├── alerts.js          # 自动告警（GitHub Issues）
+│   ├── schedule-watch.js  # 调度延迟监控
+│   ├── health-summary.js  # Actions 运行摘要
+│   └── health-view.js     # 关于页健康状态
+├── tests/                 # 6 组单元测试（core / analysis / health / history / alerts / frontend）
+├── .github/workflows/
+│   ├── update.yml         # 主采集 workflow（4 个 cron + 手动触发）
+│   └── watchdog.yml       # 独立调度监控
+├── data/
+│   ├── history.json       # 历史证据库（≤5,000 条 / 90 天）
+│   ├── events.json        # 持久事件库（≤1,000 个 / 120 天）
+│   └── alert-state.json   # 告警去重状态
+├── data.js                # 前端数据（150 条精选资讯）
+├── index.html             # 首页（五栏目 + 双层筛选）
+├── daily.html             # AI 日报页
+├── about.html             # 关于页（含数据健康状态）
+├── styles.css             # 全站深色主题样式
+└── package.json           # Node.js 依赖与测试脚本
 ```
 
-## 可选：离线脚本模式
-
-环境有 Python + feedparser 时，支持离线采集 + 日报生成：
+## 本地运行
 
 ```bash
-pip install feedparser
-
-# 采集 + 生成日报
-python scripts/rss_fetcher.py --output ./data --days 1
-python scripts/daily_generator.py --input ./data --output ./daily --markdown
+npm ci
+npm run fetch    # 采集 + AI 分析 + 生成 data.js
+npm test         # 运行全部测试
+npm run check    # 语法检查 + 全部测试
 ```
+
+环境变量：
+
+| 变量 | 说明 |
+|---|---|
+| `DEEPSEEK_API_KEY` | SenseNova API 密钥（AI 分析必需） |
+| `FINHOT_TRIGGER_EVENT` | GitHub Actions 触发事件 |
+| `FINHOT_SCHEDULE` | 当前 cron 表达式 |
+| `FINHOT_ANALYSIS_MODE` | `full` 或 `cached` |
 
 ## License
 
