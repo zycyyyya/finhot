@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.3.0-blue" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.4.0-blue" alt="version"/>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license"/>
   <img src="https://img.shields.io/badge/type-Agent_Skill-orange" alt="type"/>
   <img src="https://img.shields.io/badge/runtime-Python_3-lightgrey" alt="runtime"/>
@@ -19,7 +19,7 @@ finhot 是一个面向金融、保险和监管资讯查询的 Agent Skill。它�
 本仓库与 [finhot-web](https://github.com/zycyyyya/finhot-web) 相互独立：
 
 - **finhot**：供 Agent 调用的资讯查询 Skill，并提供可选的 Python 离线采集与日报生成脚本
-- **finhot-web**：集成 Node.js 自动采集、AI 分析、数据质量门和 GitHub Pages 展示的静态资讯站点
+- **finhot-web**：集成 Node.js 自动采集、AI 分析、数据质量门和 GitHub Pages 展示的静态资讯站点；v2.4.0 起日报顶部常驻宏观参考看板（LPR/美债/汇率/黄金随管线自动刷新，国债/存款/联邦基金利率人工核实标注）
 
 ## 核心能力
 
